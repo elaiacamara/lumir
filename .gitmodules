@@ -22,3 +22,6 @@
 [submodule "modules/nlohmann_json_v3.12.0"]
 	path = modules/nlohmann_json_v3.12.0
 	url = https://github.com/nlohmann/json
+[submodule "modules/spdlog_v1.16.0"]
+	path = modules/spdlog_v1.16.0
+	url = https://github.com/gabime/spdlog
