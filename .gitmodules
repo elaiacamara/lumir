@@ -28,3 +28,6 @@
 [submodule "modules/vulkan-lib_0.0.1"]
 	path = modules/vulkan-lib_0.0.1
 	url = https://github.com/enekocamara/vulkan-lib
+[submodule "modules/vulkan_v1.4.332"]
+	path = modules/vulkan_v1.4.332
+	url = https://github.com/KhronosGroup/Vulkan-Headers
