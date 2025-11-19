@@ -10,3 +10,6 @@
 [submodule "modules/glfw_3.4"]
 	path = modules/glfw_3.4
 	url = https://github.com/glfw/glfw
+[submodule "modules/glm_1.0.2"]
+	path = modules/glm_1.0.2
+	url = https://github.com/g-truc/glm
