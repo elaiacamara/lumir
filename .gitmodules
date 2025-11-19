@@ -13,3 +13,6 @@
 [submodule "modules/glm_1.0.2"]
 	path = modules/glm_1.0.2
 	url = https://github.com/g-truc/glm
+[submodule "modules/googletests_v1.17.0"]
+	path = modules/googletests_v1.17.0
+	url = https://github.com/google/googletest
