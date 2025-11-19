@@ -4,3 +4,6 @@
 [submodule "modules/syris-vulkan_0.0.1-vulkan"]
 	path = modules/syris-vulkan_0.0.1-vulkan
 	url = https://github.com/enekocamara/Syris
+[submodule "modules/entt_v3.15.0"]
+	path = modules/entt_v3.15.0
+	url = https://github.com/skypjack/entt
