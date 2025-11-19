@@ -25,3 +25,6 @@
 [submodule "modules/spdlog_v1.16.0"]
 	path = modules/spdlog_v1.16.0
 	url = https://github.com/gabime/spdlog
+[submodule "modules/vulkan-lib_0.0.1"]
+	path = modules/vulkan-lib_0.0.1
+	url = https://github.com/enekocamara/vulkan-lib
