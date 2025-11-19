@@ -16,3 +16,6 @@
 [submodule "modules/googletests_v1.17.0"]
 	path = modules/googletests_v1.17.0
 	url = https://github.com/google/googletest
+[submodule "modules/imgui_docking_v1.92.4-docking/imgui"]
+	path = modules/imgui_docking_v1.92.4-docking/imgui
+	url = https://github.com/ocornut/imgui
