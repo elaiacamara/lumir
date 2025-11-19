@@ -1,0 +1,6 @@
+[submodule "modules/syris"]
+	path = modules/syris
+	url = https://github.com/enekocamara/Syris
+[submodule "modules/syris-vulkan_0.0.1-vulkan"]
+	path = modules/syris-vulkan_0.0.1-vulkan
+	url = https://github.com/enekocamara/Syris
