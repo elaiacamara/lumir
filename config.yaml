@@ -1,0 +1,8 @@
+project: lumir
+current_target: lumir
+targets:
+  lumir: Executable
+modules:
+  syris-vulkan:
+    git_url: https://github.com/enekocamara/Syris
+    git_version: 0.0.1-vulkan
