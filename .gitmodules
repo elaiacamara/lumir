@@ -31,3 +31,6 @@
 [submodule "modules/vulkan_v1.4.332"]
 	path = modules/vulkan_v1.4.332
 	url = https://github.com/KhronosGroup/Vulkan-Headers
+[submodule "modules/vulkan-lib_0.0.2"]
+	path = modules/vulkan-lib_0.0.2
+	url = https://github.com/enekocamara/vulkan-lib
