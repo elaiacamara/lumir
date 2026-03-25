@@ -1,6 +1,3 @@
-[submodule "modules/syris"]
-	path = modules/syris
-	url = https://github.com/enekocamara/Syris
 [submodule "modules/syris-vulkan_0.0.1-vulkan"]
 	path = modules/syris-vulkan_0.0.1-vulkan
 	url = https://github.com/enekocamara/Syris
@@ -25,12 +22,12 @@
 [submodule "modules/spdlog_v1.16.0"]
 	path = modules/spdlog_v1.16.0
 	url = https://github.com/gabime/spdlog
-[submodule "modules/vulkan-lib_0.0.1"]
-	path = modules/vulkan-lib_0.0.1
-	url = https://github.com/enekocamara/vulkan-lib
 [submodule "modules/vulkan_v1.4.332"]
 	path = modules/vulkan_v1.4.332
 	url = https://github.com/KhronosGroup/Vulkan-Headers
 [submodule "modules/vulkan-lib_0.0.2"]
 	path = modules/vulkan-lib_0.0.2
 	url = https://github.com/enekocamara/vulkan-lib
+[submodule "modules/debug-lib_0.0.3"]
+	path = modules/debug-lib_0.0.3
+	url = https://github.com/enekocamara/debug

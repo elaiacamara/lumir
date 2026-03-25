@@ -41,7 +41,17 @@ foreach(file ${CXX_MODULES})
 endforeach()
 
 
-
+add_subdirectory(${CMAKE_SOURCE_DIR}/modules/glfw_3.4)
+add_subdirectory(${CMAKE_SOURCE_DIR}/modules/syris-vulkan_0.0.1-vulkan)
+add_subdirectory(${CMAKE_SOURCE_DIR}/modules/glm_1.0.2)
+add_subdirectory(${CMAKE_SOURCE_DIR}/modules/googletests_v1.17.0)
+add_subdirectory(${CMAKE_SOURCE_DIR}/modules/vulkan-lib_0.0.2)
+add_subdirectory(${CMAKE_SOURCE_DIR}/modules/spdlog_v1.16.0)
+add_subdirectory(${CMAKE_SOURCE_DIR}/modules/vulkan_v1.4.332)
+add_subdirectory(${CMAKE_SOURCE_DIR}/modules/nlohmann_json_v3.12.0)
+add_subdirectory(${CMAKE_SOURCE_DIR}/modules/entt_v3.15.0)
+add_subdirectory(${CMAKE_SOURCE_DIR}/modules/imgui_docking_v1.92.4-docking)
+add_subdirectory(${CMAKE_SOURCE_DIR}/modules/debug-lib_0.0.3)
 
 # Check if Doxygen is available
 find_package(Doxygen REQUIRED)
@@ -52,14 +62,14 @@ if(DOXYGEN_FOUND)
     set(DOXYGEN_IN_PATH "${CMAKE_SOURCE_DIR}/Doxyfile")  # Replace with your path if different
 
     # Create a custom target to generate documentation
-    add_custom_target(doc
+    add_custom_target(doc_lumir
         COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_IN_PATH}
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
         COMMENT "Generating API documentation with Doxygen"
         VERBATIM)
 
     # Make the doc target depend on the build target
-    add_dependencies(doc ${PROJECT_NAME})  # Replace ${PROJECT_NAME} with your target name if needed
+    add_dependencies(doc_lumir ${PROJECT_NAME})  # Replace ${PROJECT_NAME} with your target name if needed
 endif()
 
 enable_testing()
@@ -76,14 +86,15 @@ target_compile_definitions(lumir PRIVATE $<$<CONFIG:Debug>:DEBUG>)
 target_compile_definitions(lumir PRIVATE $<$<CONFIG:Release>:RELEASE>)
 
 target_include_directories(lumir PUBLIC
-
+	${CMAKE_SOURCE_DIR}/modules/syris-vulkan_0.0.1-vulkan
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_link_libraries(lumir PUBLIC )
+target_link_libraries(lumir PUBLIC syris)
 
 target_compile_definitions(lumir PRIVATE )
 
+add_compile_definitions(PROJECT_ROOT="${CMAKE_SOURCE_DIR}")
 # Enable multi-processor compilation (if supported by the compiler)
 if(MSVC)
     add_compile_options(/MP)
