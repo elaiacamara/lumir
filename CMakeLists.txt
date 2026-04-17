@@ -1,9 +1,13 @@
-cmake_minimum_required(VERSION 3.28)
+cmake_minimum_required(VERSION 4.3)
 
-project(lumir CXX)
+#set(CMAKE_EXPERIMENTAL_CXX_IMPORT_STD 451f2fe2-a8a2-47c3-bc32-94786d8fc91b)
+#set(CMAKE_CXX_MODULE_STD 1)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+project(lumir CXX)
+
 
 # Set the output directory structure
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/output/lib/$<CONFIG>")
@@ -90,7 +94,7 @@ target_include_directories(lumir PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_link_libraries(lumir PUBLIC syris)
+target_link_libraries(lumir PUBLIC syris vulkan-lib)
 
 target_compile_definitions(lumir PRIVATE )
 

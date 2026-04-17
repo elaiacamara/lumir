@@ -2,6 +2,9 @@ module;
 #include <vulkan-lib/Config.h>
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+#include <filesystem>
+
 module lumir.app;
 import vulkan_lib.instance;
 import vulkan_lib.logging;
@@ -11,22 +14,25 @@ import vulkan_lib.descriptors;
 import vulkan_lib.framebuffer;
 import vulkan_lib.pipeline;
 import vulkan_lib.commands;
-import syris.log.Logger;
+import debug_lib.Logger;
 import vulkan_lib.sync;
 import vulkan_lib.scene;
 import debug_lib.result;
 import vulkan_lib.camera3D;
 import vulkan_lib.renderStructs;
-import <glm/gtc/matrix_transform.hpp>;
+import vulkan_lib.Swapchain;
+import vulkan_lib.SwapchainFrame;
+import vulkan_lib.memory;
 
-import <expected>;
-import <format>;
+import syris.input.input;
+//import std;
 
 namespace lumir {
 	App::App(CreateInfo info) : m_window(info.window_info){
 		//instance
-        Syris::Logger::client_info(std::format("window is {:p}", (void *)m_window.get_window()));
-		auto instance_res = vkInit::make_instance("voxel game", "voxel engine");
+		Syris::Input::get(m_window.get_window());
+
+		auto instance_res = vkl::make_instance("voxel game", "voxel engine");
 		if (!instance_res)
 			throw std::runtime_error("failed to make instance");
 		m_instance = std::move(instance_res.value());
@@ -84,49 +90,20 @@ namespace lumir {
         m_transfer_command_pool = transfer_command_pool_res.value();
             
             //main command buffer
-        vkl::CommandBufferInputBundle gpCommandPoolInput = {m_device, m_graphs_pres_command_pool, m_swapchain.get_frames()};
-        auto main_command_buffer_res = vkl::make_command_buffer(gpCommandPoolInput);
+
+        auto main_command_buffer_res = vkl::make_command_buffer(m_device, m_graphs_pres_command_pool);
         if (!main_command_buffer_res)
             throw std::runtime_error("Failed to make main command buffer");
         m_main_command_buffer = main_command_buffer_res.value();
             
             //transfer command buffer
-        vkl::CommandBufferInputBundle transCommandBufferInput = {
-            m_device, m_transfer_command_pool, m_swapchain.get_frames()};
-        auto transfer_command_buffer_res = vkl::make_command_buffer(transCommandBufferInput);
+        auto transfer_command_buffer_res = vkl::make_command_buffer(m_device, m_transfer_command_pool);
         if (!transfer_command_buffer_res)
             throw std::runtime_error("Failed to make transfer command buffer");
         m_transfer_command_buffer = transfer_command_buffer_res.value();
 
-        //swapchain
-        vkl::Swapchain::CreateInfo swapchain_info{
-            .logical_device = m_device,
-            .physical_device = m_physical_device,
-            .surface = m_surface,
-            .width = info.window_info.dimmensions.x,
-            .height = info.window_info.dimmensions.y,
-            .command_pool = m_graphs_pres_command_pool
-        };
-        m_swapchain = vkl::Swapchain(swapchain_info);
-
-        /*
-        if (!vkl::query_swapchain_support(m_physical_device, m_surface))
-            throw std::runtime_error("swapchain not supported");
-        auto bundle_res = vkl::create_swapchain_bundle(m_device, m_physical_device, m_surface,
-            info.window_info.dimmensions.x, info.window_info.dimmensions.y);
-        if (!bundle_res)
-            throw std::runtime_error("failed to create swapchain bundle");
-        vkl::SwapChainBundle bundle = bundle_res.value();
-        m_swapchain = bundle.swapchain;
-        m_swapchain_extent = bundle.extent;
-        m_swapchain_frames = bundle.frames;
-        m_swapchain_format = bundle.format;
-        m_max_frames_in_flight = static_cast<int>(m_swapchain_frames.size());
-        m_frame_number = 0;*/
-
-        
-		//descriptor set layouts
-        vkInit::DescriptorSetLayoutData vertex_bindings = {};
+        //descriptor set layouts
+        vkl::DescriptorSetLayoutData vertex_bindings = {};
         vertex_bindings.count = 2;
 
         vertex_bindings.indices.push_back(0);
@@ -139,23 +116,115 @@ namespace lumir {
         vertex_bindings.counts.push_back(1);
         vertex_bindings.stages.push_back(vk::ShaderStageFlagBits::eVertex);
 
-        auto vertex_descriptor_set_layout_res = vkInit::make_descriptor_set_layout(m_device, vertex_bindings);
-		if (!vertex_descriptor_set_layout_res)
-			throw std::runtime_error("failed to make descriptor set layout");
+        auto vertex_descriptor_set_layout_res = vkl::make_descriptor_set_layout(m_device, vertex_bindings);
+        if (!vertex_descriptor_set_layout_res)
+            throw std::runtime_error("failed to make descriptor set layout");
         m_vertex_descriptor_set_layout = vertex_descriptor_set_layout_res.value();
-	    
 
-        vkInit::DescriptorSetLayoutData fragment_bindings = {};
+
+        vkl::DescriptorSetLayoutData fragment_bindings = {};
         fragment_bindings.count = 1;
         fragment_bindings.indices.push_back(0);
         fragment_bindings.types.push_back(vk::DescriptorType::eCombinedImageSampler);
         fragment_bindings.counts.push_back(1);
         fragment_bindings.stages.push_back(vk::ShaderStageFlagBits::eFragment);
 
-        auto fragment_descriptor_set_layout_res = vkInit::make_descriptor_set_layout(m_device, fragment_bindings);
-		if (!fragment_descriptor_set_layout_res)
-			throw std::runtime_error("failed to make descriptor set layout");
+        auto fragment_descriptor_set_layout_res = vkl::make_descriptor_set_layout(m_device, fragment_bindings);
+        if (!fragment_descriptor_set_layout_res)
+            throw std::runtime_error("failed to make descriptor set layout");
         m_fragment_descriptor_set_layout = fragment_descriptor_set_layout_res.value();
+        
+        //descriptor pool
+        auto support_res = vkl::Swapchain::query_swapchain_support(m_physical_device, m_surface);
+        if (!support_res)
+            throw std::runtime_error("Failed to query swapchain support");
+        vkl::SwapChainSupportDetails support = support_res.value();
+        uint32_t frames_in_flight = std::min(
+            support.capabilities.maxImageCount,
+            support.capabilities.minImageCount + 1
+        );
+        
+        auto descriptor_pool_res = vkl::make_descriptor_pool(m_device, static_cast<uint32_t>(frames_in_flight * 2), std::vector<vkl::DescriptorSetLayoutData>{ vertex_bindings, fragment_bindings});
+        if (!descriptor_pool_res)
+            throw std::runtime_error("Failed to make descriptor pool");
+        m_descriptor_pool = descriptor_pool_res.value();
+
+        auto texture_info = vkl::Image::CreateInfo{
+            .device = m_device,
+            .physical_device = m_physical_device,
+            .file_path = std::filesystem::path(PROJECT_ROOT) / "assets" / "images" / "smile.jpg",
+            .command_buffer = m_main_command_buffer,
+            .command_pool = m_graphs_pres_command_pool,
+            .queue = m_graphics_queue.queue,
+            .descriptor_layout = vk::DescriptorSetLayout{},
+            .descriptor_pool = m_descriptor_pool
+        };
+        m_texture = std::make_unique<vkl::Image>(texture_info);
+
+        //swapchain
+        auto populate_descriptor_sets = [this](vkl::SwapchainFrame& frame) -> db::Result<db::EmptyOk>{
+            vkl::BufferInput camera_buffer_input{
+                .device = m_device,
+                .physical_device = m_physical_device,
+                .size = sizeof(glm::mat4) * 3,
+                .usage = vk::BufferUsageFlagBits::eUniformBuffer,
+                .properties = vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent
+            };
+            auto camera_buffer_res = vkl::create_buffer(camera_buffer_input);
+            if (!camera_buffer_res)
+				return db::error("Failed to create camera buffer", camera_buffer_res.error());
+            vk::DescriptorBufferInfo buffer_info{
+                camera_buffer_res.value().buffer,   // your VkBuffer
+                0,        // offset
+                sizeof(glm::mat4) * 3 // or sizeof(your data)
+            };
+
+            vk::WriteDescriptorSet write_set_0{
+                frame.m_descriptor_sets[0],                 // dstSet
+                0,                             // dstBinding
+                0,                             // dstArrayElement
+                1,                             // descriptorCount
+                vk::DescriptorType::eUniformBuffer,
+                nullptr,
+                &buffer_info
+            };
+            m_device.updateDescriptorSets(write_set_0, {});
+            vk::DescriptorImageInfo image_info{
+                m_texture->get_sampler(),                                   // sampler
+                m_texture->get_image_view(),                                // image view
+                vk::ImageLayout::eShaderReadOnlyOptimal      // MUST match current layout
+            };
+            vk::WriteDescriptorSet write_set_1{
+                frame.m_descriptor_sets[1],                 // dstSet
+                0,                             // dstBinding
+                0,                             // dstArrayElement
+                1,                             // descriptorCount
+                vk::DescriptorType::eCombinedImageSampler,
+				&image_info,
+                nullptr
+            };
+            m_device.updateDescriptorSets(write_set_1, {});
+            return db::EmptyOk{};
+        };
+
+            
+        auto layouts_buffer = std::vector<vk::DescriptorSetLayout>{ m_vertex_descriptor_set_layout, m_fragment_descriptor_set_layout };
+        vkl::Swapchain::CreateInfo swapchain_info{
+            .logical_device = m_device,
+            .physical_device = m_physical_device,
+            .surface = m_surface,
+            .width = info.window_info.dimmensions.x,
+            .height = info.window_info.dimmensions.y,
+            .command_pool = m_graphs_pres_command_pool,
+			.descriptor_pool = m_descriptor_pool,
+			.descriptor_set_layouts = layouts_buffer,
+            .populate_descriptor_sets = populate_descriptor_sets
+        };
+        m_swapchain = vkl::Swapchain(swapchain_info);
+
+		m_max_frames_in_flight = m_swapchain.get_frames().size();
+
+
         //pipeline
         auto shader_folder_path = std::filesystem::path(PROJECT_ROOT) / "assets" / "shaders" / "example";
 		vkl::GraphicsPipelineBundle specs = {};
@@ -185,14 +254,10 @@ namespace lumir {
 
 
             //frame command buffers
-        if (!vkl::make_frame_command_buffers(gpCommandPoolInput))
+        if (!vkl::make_frame_command_buffers(m_device, m_graphs_pres_command_pool, &m_swapchain.get_frames()))
             throw std::runtime_error("Failed to make frame command buffers");
        
-        //descriptor and frames
-        auto descriptor_pool_res = vkInit::make_descriptor_pool(m_device, static_cast<uint32_t>(m_swapchain.get_frames().size() * 2), std::vector<vkInit::DescriptorSetLayoutData>{ vertex_bindings , fragment_bindings});
-        if (!descriptor_pool_res)
-            throw std::runtime_error("Failed to make descriptor pool");
-        m_descriptor_pool = descriptor_pool_res.value();
+        
         /*
         for (vkl::SwapchainFrame& frame : m_swapchain_frames) {
             auto frame_in_flight_fence_res = vkInit::make_fence(m_device);
@@ -240,17 +305,22 @@ namespace lumir {
         glm::vec3 center = glm::vec3(0.0f);
         glm::vec3 up = { 0.0f, -1.0f, 0.0f };
         m_camera = vkInit::Camera{.eye = eye, .center = center, .up = up };
+        
+        
 	}
 
-	void App::run() {
+	auto App::run() -> db::Result<db::EmptyOk>{
         Scene scene;
 		while (!m_window.should_window_close()) {
+			glfwPollEvents();
             auto res = render(scene);
             if (!res) {
-                Syris::Logger::client_error(res.error().to_string());
-                exit(1);
+                db::Logger::client_error(res.error().to_string());
+                return db::error("Error running the application", res.error());
             }
+            //Syris::Input::is_key_pressed(GLFW_W);
         }
+        return db::EmptyOk{};
 	}
     auto App::render(Scene& scene) -> db::Result<db::EmptyOk> {
         if (m_device.waitForFences(1, &m_swapchain.get_frames()[m_frame_number].m_in_flight_fence,
@@ -262,25 +332,25 @@ namespace lumir {
         if (image_index.result == vk::Result::eErrorOutOfDateKHR ||
             image_index.result == vk::Result::eSuboptimalKHR) {
             if (!recreate_swapchain()) {
-                if constexpr (_DEBUG)
-                    Syris::Logger::core_error("CRITICAL ERROR failed to recreate swapchain\n");
+                //if constexpr (_DEBUG)
+                    db::Logger::core_error("CRITICAL ERROR failed to recreate swapchain\n");
                 return db::error("Failed to recreate swapchain");
             }
             return db::EmptyOk{};
         }
         else if (image_index.result != vk::Result::eSuccess) {
-            if constexpr (_DEBUG)
-                Syris::Logger::core_error("failed to acquire the next image.\n");
+            //if constexpr (_DEBUG)
+                db::Logger::core_error("failed to acquire the next image.\n");
             return db::error("Failed to acquire next image");
         }
         //todo
         //camera.update(delta);
 
-        vk::CommandBuffer commandBuffer = m_swapchain.get_frames()[m_frame_number].m_command_buffer;
+        vk::CommandBuffer command_buffer = m_swapchain.get_frames()[m_frame_number].m_command_buffer;
 
-        if (commandBuffer.reset() != vk::Result::eSuccess)
+        if (command_buffer.reset() != vk::Result::eSuccess)
             return db::error("Failed to reset command buffer");
-
+        m_camera.update();
         //prepare_frame(image_index.value, m_scene);
 
         //PREPRARE FRAME
@@ -300,7 +370,7 @@ namespace lumir {
         */
         //RECORD
         
-        if (!record_draw_buffer()) {
+        if (!record_draw_buffer(command_buffer)) {
             return db::error("Failed to draw the command buffer");
         }
         vk::SubmitInfo submitInfo = {};
@@ -312,7 +382,7 @@ namespace lumir {
         submitInfo.pWaitSemaphores = waitSemaphores;
         submitInfo.pWaitDstStageMask = waitStages;
         submitInfo.commandBufferCount = 1;
-        submitInfo.pCommandBuffers = &commandBuffer;
+        submitInfo.pCommandBuffers = &command_buffer;
         vk::Semaphore signalSemaphores[] = {
             m_swapchain.get_frames()[m_frame_number].m_render_finished };
         submitInfo.signalSemaphoreCount = 1;
@@ -375,9 +445,9 @@ namespace lumir {
         return db::error("not implemented");
     }
 
-    auto App::record_draw_buffer() -> db::Result<db::EmptyOk> {
+    auto App::record_draw_buffer(vk::CommandBuffer command_buffer) -> db::Result<db::EmptyOk> {
         vk::CommandBufferBeginInfo beginInfo = {};
-        if (m_main_command_buffer.begin(beginInfo) != vk::Result::eSuccess)
+        if (command_buffer.begin(beginInfo) != vk::Result::eSuccess)
             return db::error("failed to begin main command buffer");;
 
         vk::RenderPassBeginInfo renderPassInfo = {};
@@ -386,26 +456,26 @@ namespace lumir {
         renderPassInfo.renderArea.offset.x = 0;
         renderPassInfo.renderArea.offset.y = 0;
         renderPassInfo.renderArea.extent = m_swapchain.get_extent();
-        vk::ClearValue clearColor = { std::array<float, 4>{0.0f, 0.5f, 0.25f, 1.0f} };
+        vk::ClearValue clearColor = { std::array<float, 4>{0.0f, 0.0f, 1.0f, 1.0f} };
         renderPassInfo.clearValueCount = 1;
         renderPassInfo.pClearValues = &clearColor;
 
-        m_main_command_buffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
+        command_buffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
 
-        m_main_command_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_layout, 0, 2, m_swapchain.get_frames()[m_frame_number].m_descriptor_sets.data(),0, nullptr);
+        command_buffer.bindDescriptorSets(vk::PipelineBindPoint::eGraphics, m_layout, 0, 2, m_swapchain.get_frames()[m_frame_number].m_descriptor_sets.data(),0, nullptr);
 
-        m_main_command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_pipeline);
+        command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_pipeline);
 
         vk::Buffer vertexBuffers[] = { m_vertex_manager.m_vertex_buffer.buffer };
         vk::DeviceSize offsets[] = { 0 };
-        m_main_command_buffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
+        command_buffer.bindVertexBuffers(0, 1, vertexBuffers, offsets);
 
-        m_main_command_buffer.draw(m_vertex_manager.m_sizes[0], 3, m_vertex_manager.m_offsets[0],
+        command_buffer.draw(m_vertex_manager.m_sizes[0], 3, m_vertex_manager.m_offsets[0],
             0);
 
-        m_main_command_buffer.endRenderPass();
+        command_buffer.endRenderPass();
 
-        if (m_main_command_buffer.end() != vk::Result::eSuccess)
+        if (command_buffer.end() != vk::Result::eSuccess)
             return db::error("Failed to end render pass");
         return db::EmptyOk{};
     }

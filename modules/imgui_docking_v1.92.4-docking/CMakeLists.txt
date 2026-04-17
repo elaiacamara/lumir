@@ -50,7 +50,7 @@ set(CTEST_BINARY_DIRECTORY "${CMAKE_SOURCE_DIR}/Testing")
 add_library(imgui_docking STATIC)
 target_sources(imgui_docking
     PRIVATE ${SOURCES}
-    PRIVATE FILE_SET CXX_MODULES FILES ${CXX_MODULES}
+    #PRIVATE FILE_SET CXX_MODULES FILES ${CXX_MODULES}
 )
 target_compile_definitions(imgui_docking PRIVATE $<$<CONFIG:Debug>:DEBUG>)
 target_compile_definitions(imgui_docking PRIVATE $<$<CONFIG:Release>:RELEASE>)

@@ -1,6 +1,7 @@
 module;
 #include <vulkan-lib/Config.h>
-
+#include <vector>
+#include <unordered_map>
 export module lumir.app;
 
 import lumir.MainWindow;
@@ -13,8 +14,7 @@ import vulkan_lib.Image;
 import vulkan_lib.vertexManager;
 import debug_lib.result;
 import vulkan_lib.camera3D;
-import <vector>;
-import <unordered_map>;
+
 
 namespace lumir {
 	export class App {
@@ -24,11 +24,11 @@ namespace lumir {
 		};
 		App(CreateInfo info);
 		~App() {};
-		void run();
+		auto run() -> db::Result<db::EmptyOk>;
 	private:
 		auto render(Scene& scene) -> db::Result<db::EmptyOk>;
         auto recreate_swapchain() -> db::Result<db::EmptyOk>;
-		auto record_draw_buffer() -> db::Result<db::EmptyOk>;
+		auto record_draw_buffer(vk::CommandBuffer command_buffer) -> db::Result<db::EmptyOk>;
 		//window
 		lumir::MainWindow m_window;
 		vk::SurfaceKHR m_surface;
@@ -80,7 +80,7 @@ namespace lumir {
 
 
 		//assets
-        std::unordered_map<MeshType, vkl::Image*> m_materials;
+        std::unique_ptr<vkl::Image> m_texture;
 		VertexManager m_vertex_manager;
         
 		vkInit::Camera m_camera;

@@ -20,7 +20,8 @@ layout(location = 1) out vec2 fragTexCoord;
 void main() {
     int instance_index = gl_InstanceIndex;
     vec2 pos = vertexPosition + vec2(0, instance_index * 1.0f); 
-    gl_Position = cameraData.viewProjection * ObjectData.model[0] * vec4(pos, 0.0, 1.0);
+    gl_Position = cameraData.viewProjection /* ObjectData.model[0] */ * vec4(pos, 0.0, 1.0);
+    //gl_Position = vec4(pos, 0.0, 1.0);
     if (instance_index == 0)
         fragColor = vec4(1.0f, 1.0f,1.0f,0.1f);
     if (instance_index == 1)
