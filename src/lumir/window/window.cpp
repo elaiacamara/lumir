@@ -1,4 +1,4 @@
-module lumir.MainWindow;
+#include "Window.hpp"
 
 namespace lumir {
 	MainWindow::MainWindow(Syris::Window::CreateInfo info) : Window(info) {

@@ -1,0 +1,161 @@
+
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout(rgba32f, binding = 0) uniform image2D img;
+
+
+
+
+float iSeed = 3.0;
+
+vec2 hash2(vec2 p)
+{
+    // simple random hash
+    p = vec2(dot(p, vec2(127.1, 311.7)),
+             dot(p, vec2(269.5, 183.3)));
+    return fract(sin(p) * 43758.5453123);
+}
+
+vec2 hash22(vec2 p)
+{
+    p = vec2(
+        dot(p, vec2(127.1, 311.7)),
+        dot(p, vec2(269.5, 183.3))
+    );
+    return fract(sin(p) * 43758.5453123);
+}
+
+// ---------- smooth gradient noise ----------
+float gradNoise(vec2 p)
+{
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+
+    // smooth interpolation curve
+    vec2 u = f * f * (3.0 - 2.0 * f);
+
+    float a = dot(hash22(i + vec2(0.0, 0.0)) - 0.5, f - vec2(0.0, 0.0));
+    float b = dot(hash22(i + vec2(1.0, 0.0)) - 0.5, f - vec2(1.0, 0.0));
+    float c = dot(hash22(i + vec2(0.0, 1.0)) - 0.5, f - vec2(0.0, 1.0));
+    float d = dot(hash22(i + vec2(1.0, 1.0)) - 0.5, f - vec2(1.0, 1.0));
+
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+// ---------- FBM (safe frequencies, no power-of-two ladder) ----------
+
+
+float fbm(vec2 uv)
+{
+    float value = 0.0;
+    float amp = 0.5;
+    float sum = 0.0;
+
+    mat2 m = mat2(1.6, 1.2, -1.2, 1.6);
+
+    for (int i = 0; i < 6; i++)
+    {
+        value += amp * gradNoise(uv);
+        uv = m * uv + 17.3;
+        sum += amp;
+        amp *= 0.5;
+    }
+
+    value /= sum;          // normalize to roughly [-1, 1]
+    return value * 0.5 + 0.5; // convert to [0, 1]
+}
+
+struct Neighbor {
+    ivec2 ID;
+    vec2 pos;
+    float dist;
+};
+
+struct Cell {
+    Neighbor cells[9];
+};
+
+Cell voronoiAllNeighbors(vec2 uv)
+{
+    vec2 g = floor(uv);
+    vec2 f = fract(uv);
+
+    Cell cell;
+    int index = 0;
+
+    for (int j = -1; j <= 1; ++j)
+    for (int i = -1; i <= 1; ++i)
+    {
+        vec2 o = vec2(float(i), float(j));
+        vec2 seed = hash2(g + o);
+        vec2 diff = o + seed - f;
+
+        cell.cells[index].pos = g + o + seed;
+        cell.cells[index].dist = length(diff);
+        cell.cells[index].ID = ivec2(g + o);
+        index++;
+    }
+
+    for (int i = 0; i < 8; ++i)
+    for (int j = i+1; j < 9; ++j)
+    {
+        if (cell.cells[j].dist < cell.cells[i].dist)
+        {
+            Neighbor t = cell.cells[i];
+            cell.cells[i] = cell.cells[j];
+            cell.cells[j] = t;
+        }
+    }
+
+    return cell;
+}
+
+void main()
+{
+    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = imageSize(img);
+    if (coord.x >= size.x || coord.y >= size.y) return;
+
+    vec2 fragCoord = vec2(coord);
+    vec2 iResolution = vec2(size);
+
+    vec2 uv = fragCoord / iResolution;
+    uv *= 10.0;
+
+    Cell cell = voronoiAllNeighbors(voronoiAllNeighbors(uv).cells[0].pos);
+    Cell ordered = cell;
+
+    bool continent_render = true;
+    bool height_map_render = true;
+    bool render_features = false;
+
+    vec3 color = vec3(0.0);
+
+    if (continent_render)
+    {
+        float height = fbm(uv);
+        bool isContinental = fbm(floor(cell.cells[0].pos) * 10.0) > 0.5;
+
+        if (!isContinental)
+        {
+            height = 0.0;
+        }
+        else
+        {
+            height = clamp(height, 0.4, 0.5);
+        }
+
+        if (render_features)
+        {
+            float alignment = fbm(uv * 2.0);
+            color = vec3(alignment, height, 0.0);
+        }
+        else if (height_map_render)
+        {
+            color = vec3(height);
+        }
+    }
+
+    imageStore(img, coord, vec4(color, 1.0));
+}

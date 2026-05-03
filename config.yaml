@@ -6,3 +6,8 @@ modules:
   syris-vulkan:
     git_url: https://github.com/enekocamara/Syris
     git_version: 0.0.1-vulkan
+  named_type:
+    git_url: https://github.com/joboccara/NamedType
+    git_version: v1.1.0
+
+static_cmake : true

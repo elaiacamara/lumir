@@ -3,9 +3,12 @@
 #include <vector>
 #include <ranges>
 #include <iostream>
-import lumir.app;
-import syris.window;
-import syris.statistics.statistics;
+#include "lumir/app/App.hpp"
+#include <syris/app/Window.hpp>
+#include <syris/statistics/statistics.hpp>
+#include "lumir/world/World.hpp"
+#include "lumir/app/Resources.hpp"
+#include <print>
 
 
 int main(){
@@ -25,20 +28,29 @@ int main(){
         std::cout << i << "";
     }
     Syris::Statistics statistics;
+    lumir::Resources::init();
+    lumir::Resources::get().thread_pool.enqueue([](){db::Logger::core_info("hello from another thread");});
+    
     lumir::App::CreateInfo app_info{
         .window_info = Syris::Window::CreateInfo{
             .name = "engine",
-            .dimmensions = {1000,1000},
+            .dimmensions = {1500,1000},
             .vSync = true,
             .imgui = Syris::Window::ImGuiOptions{
                 .main_dockspace = true
             },
             .path_to_shader_folder = std::filesystem::path(PROJECT_ROOT) / "assets" / "shaders",
             .statistics = statistics,
+        },
+        .world_info = lumir::World::CreateInfo{
+            .chunk_render_count = 3,
+            .chunk_dimmensions = {16,16,16},
         }
     };
     lumir::App app(app_info);
-    app.run();
+    auto res = app.run();
+    if (!res)
+        db::break_point();
     /*
     vkl::App app(1000,1000);
     app.run();*/

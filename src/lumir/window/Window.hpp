@@ -1,11 +1,11 @@
-export module lumir.MainWindow;
+#pragma once
 
-import syris.window;
-import syris.event;
-import syris.engine_time;
+#include <syris/app/Window.hpp>
+#include <syris/events/Event.hpp>
+#include <syris/utils/EngineTime.hpp>
 
 namespace lumir {
-	export class MainWindow : public Syris::Window {
+	class MainWindow : public Syris::Window {
 	public:
 		MainWindow(Syris::Window::CreateInfo info);
 		~MainWindow() {};

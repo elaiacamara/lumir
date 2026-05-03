@@ -28,6 +28,12 @@
 [submodule "modules/vulkan-lib_0.0.2"]
 	path = modules/vulkan-lib_0.0.2
 	url = https://github.com/enekocamara/vulkan-lib
-[submodule "modules/debug-lib_0.0.3"]
-	path = modules/debug-lib_0.0.3
+[submodule "modules/named_type_v1.1.0"]
+	path = modules/named_type_v1.1.0
+	url = https://github.com/joboccara/NamedType
+[submodule "modules/utils-lib_0.0.1"]
+	path = modules/utils-lib_0.0.1
+	url = https://github.com/enekocamara/utils-lib
+[submodule "modules/debug-lib_0.0.4"]
+	path = modules/debug-lib_0.0.4
 	url = https://github.com/enekocamara/debug
