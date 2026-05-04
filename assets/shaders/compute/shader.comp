@@ -5,7 +5,7 @@ layout(rgba32f, binding = 0) uniform image2D img;
 
 
 
-float iSeed = 3.0;
+float iSeed = 30.0;
 float iTime  = 0.0;
 
 vec2 hash2(vec2 p)
@@ -35,91 +35,6 @@ float valueNoise(vec2 p)
     return mix(mix(a,b,u.x), mix(c,d,u.x), u.y);
 }
 
-
-// High-frequency noise independent of Voronoi
-float detailNoise(vec2 uv, int iters)
-{
-    
-    float n = 0.0;
-    float freq = 1.0;
-    float amp = 1.0;
-    float totalAmp = 0.0;
-
-    for(int i=0;i<iters;i++)
-    {
-        n += valueNoise(uv * freq) * amp;
-        totalAmp += amp;
-        freq *= 2.0;
-        amp *= 0.5;
-    }
-
-    return n / totalAmp;
-}
-
-
-
-struct Neighbor {
-    ivec2 ID;
-    vec2 pos;   // seed position
-    float dist; // distance to current uv
-};
-
-struct Cell {
-    Neighbor cells[9];
-};
-
-
-Cell voronoiAllNeighbors(vec2 uv)
-{
-    // --- Low-frequency noise warp ---
-    vec2 warp = vec2(
-        valueNoise(uv * 0.35 + 10.0),
-        valueNoise(uv * 0.35 - 10.0)
-    );
-    //uv += (warp - 0.5) * 3.0;
-
-    vec2 g = floor(uv);
-    vec2 f = fract(uv);
-    //uv = g;
-
-    Cell cell;
-
-    int index = 0;
-    // Compute all 9 neighbors
-    for (int j = -1; j <= 1; ++j){
-    for (int i = -1; i <= 1; ++i)
-    {
-        vec2 neighborOffset = vec2(float(i), float(j));
-        vec2 seed = hash2(g + neighborOffset);
-        vec2 diff = neighborOffset + seed - f;
-
- //       float p = 1.4;
-        //pow(pow(abs(diff.x), p) + pow(abs(diff.y), p), 1.0 / p);
-        float dist = length(diff);
-
-        cell.cells[index].pos = g + neighborOffset + seed;
-        cell.cells[index].dist = dist;
-        cell.cells[index].ID = ivec2(g + neighborOffset);
-        index++;
-    }
-    }
-
-    // --- Simple bubble sort by distance ---
-    for (int i = 0; i < 9-1; ++i)
-    {
-        for (int j = i+1; j < 9; ++j)
-        {
-            if (cell.cells[j].dist < cell.cells[i].dist)
-            {
-                Neighbor tmp = cell.cells[i];
-                cell.cells[i] = cell.cells[j];
-                cell.cells[j] = tmp;
-            }
-        }
-    }
-
-    return cell;
-}
 
 // Simplex noise by Ian McEwan, Ashima Arts
 // https://github.com/ashima/webgl-noise
@@ -176,6 +91,95 @@ float snoise(vec2 v)
     return 70.0 * dot(n, vec3(1.0));
 }
 
+
+// High-frequency noise independent of Voronoi
+float detailNoise(vec2 uv, int iters)
+{
+    //return valueNoise(uv * 2.0); // single high freq
+    float n = 0.0;
+    float freq = 1.0;
+    float amp = 1.0;
+    float totalAmp = 0.0;
+
+    for(int i=0;i<iters;i++)
+    {
+        n += (snoise(uv * freq) * 0.5 + 0.5) * amp; // normalize
+        //n += valueNoise(uv * freq) * amp;
+        totalAmp += amp;
+        freq *= 2.0;
+        amp *= 0.5;
+    }
+
+    return n / totalAmp;
+}
+
+
+
+struct Neighbor {
+    ivec2 ID;
+    vec2 pos;   // seed position
+    float dist; // distance to current uv
+};
+
+struct Cell {
+    Neighbor cells[9];
+};
+
+
+Cell voronoiAllNeighbors(vec2 uv)
+{
+    // --- Low-frequency noise warp ---
+    vec2 warp = vec2(
+        valueNoise(uv * 0.035 + 10.0),
+        valueNoise(uv * 0.035 - 10.0)
+    );
+    uv += detailNoise( uv , 6);
+//    uv += detailNoise(uv, 8);
+    //uv += (warp - 0.5) * 3.0;
+
+    vec2 g = floor(uv);
+    vec2 f = fract(uv);
+    //uv = g;
+
+    Cell cell;
+
+    int index = 0;
+    // Compute all 9 neighbors
+    for (int j = -1; j <= 1; ++j){
+    for (int i = -1; i <= 1; ++i)
+    {
+
+        vec2 neighborOffset = vec2(float(i), float(j));
+        vec2 seed = hash2(g + neighborOffset);
+        vec2 diff = neighborOffset + seed - f;
+
+ //       float p = 1.4;
+        //pow(pow(abs(diff.x), p) + pow(abs(diff.y), p), 1.0 / p);
+        float dist = length(diff);
+
+        cell.cells[index].pos = g + neighborOffset + seed;
+        cell.cells[index].dist = dist;
+        cell.cells[index].ID = ivec2(g + neighborOffset);
+        index++;
+    }
+    }
+
+    // --- Simple bubble sort by distance ---
+    for (int i = 0; i < 9-1; ++i)
+    {
+        for (int j = i+1; j < 9; ++j)
+        {
+            if (cell.cells[j].dist < cell.cells[i].dist)
+            {
+                Neighbor tmp = cell.cells[i];
+                cell.cells[i] = cell.cells[j];
+                cell.cells[j] = tmp;
+            }
+        }
+    }
+
+    return cell;
+}
 // Fractal Brownian Motion (FBM) with octave control
 float fbm(vec2 p, int octaves, float lacunarity, float gain)
 {
@@ -204,16 +208,39 @@ vec2 plateDirection(vec2 cellSeed, float iSeed)
     return vec2(cos(angle), sin(angle)); // unit vector
 }
 
-vec3 heightToColor(float h){
-    vec3 color;
-
-    if (h < 0.5) {
-        // Ocean: dark blue to light blue
+vec3 heightToColor(float h)
+{
+    if (h < 0.5)
+    {
+        // Ocean
         float t = h / 0.5;
-        color = mix(vec3(0.0, 0.0, 0.3), vec3(0.0, 0.5, 1.0), t);
-    } else
-        color = vec3(0.0, 0.5, 0.0);
-    return color;
+        return mix(vec3(0.0, 0.0, 0.3), vec3(0.0, 0.5, 1.0), t);
+    }
+
+    // Land remapped to 0..1
+    float t = (h - 0.5) / 0.5;
+
+    // Gradient steps
+    vec3 beach  = vec3(0.9, 0.85, 0.5);  // yellow
+    vec3 grass  = vec3(0.1, 0.6, 0.2);   // green
+    vec3 dirt   = vec3(0.4, 0.3, 0.2);   // brown
+    vec3 snow   = vec3(1.0);             // white
+
+    if (t < 0.1)
+    {
+        // beach
+        return mix(beach, grass, t / 0.6);
+    }
+    else if (t < 0.5)
+    {
+        // grass → dirt
+        return mix(grass, dirt, (t - 0.15) / (0.5 - 0.15));
+    }
+    else
+    {
+        // dirt → snow
+        return mix(dirt, snow, (t - 0.5) / 0.5);
+    }
 }
 
 float remap(float value, float oldMin, float oldMax, float newMin, float newMax) {
@@ -266,13 +293,13 @@ float boost(float x, float power)
 float plateAlignment(Cell cell, vec2 uv, float iSeed)
 {
     float uplift = 0.0;
-    uv = cell.cells[0].pos;
+    //uv = cell.cells[0].pos;
 
     for (int n = 0; n < 8; ++n)
     {
         vec2 neighborPos = cell.cells[n].pos;
         float dist = cell.cells[n].dist;
-
+        dist = length(cell.cells[n].pos - uv);
         vec2 dirToNeighbor = normalize(neighborPos - uv);
 
         // Neighbor's plate direction
@@ -319,6 +346,23 @@ float plateAlignment(Cell cell, vec2 uv, float iSeed)
     return uplift; // 0..1
 }
 
+float get_height(Cell cell, vec2 uv, float continental_threshold){
+    float height = detailNoise(uv,6);
+
+    bool isContinental = is_continental(cell.cells[0].pos, continental_threshold);
+    if (!isContinental){
+        height = height / 4.0;
+    }else{
+        height = ((clamp(height, 0.4, 1.0) - 0.4) / 2.0) + 0.45;
+    }
+    float alignment = plateAlignment(cell, uv, iSeed);
+    if (alignment > 0.0){
+        if (height >= 0.5)
+            height += clamp(alignment * 1.5, 0.0, 0.5);
+    }
+    return height;
+}
+
 void main()
 {   
     ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
@@ -343,15 +387,11 @@ void main()
     float continental_threshold = 0.55;
     float noise_frequency = 15.0;
     
-    bool is_continent = is_continental(cell.cells[0].pos, continental_threshold);
-    if (is_continent){
-        float height = length(cell.cells[0].pos - uv);
-        imageStore(img, coord, vec4(vec3(height), 1.0));
-    }
-    else
-        imageStore(img, coord, vec4(0.0,0.1,0.8, 1.0));
-    return ;
-        
+    float height_2 = get_height(cell, uv, continental_threshold);
+    vec3 color = heightToColor(height_2);
+    imageStore(img, coord, vec4(color, 1.0));
+    return;
+    
     if (continent_render){
          // --- determine cell type ---
    
@@ -384,11 +424,11 @@ void main()
                     height = 0.0;
 
                 }else{
-                    height = clamp(height, 0.4, 0.5);
+                    height = ((clamp(height, 0.4, 1.0) - 0.4) / 2.0) + 0.45;
                     //if (height > 0.4)
                     //    height = 0.5;
 
-                    
+                    /*
                     bool isF2Oceanic = !is_continental(cell_local.cells[1].pos, continental_threshold);
                     if (isF2Oceanic){
                         //height = 0.4;
@@ -396,22 +436,26 @@ void main()
                         //imageStore(img, coord, vec4(0.5,0.0,0.0,1.0));// / length(cell_local.cells[1].pos - cell_local.cells[0].pos)), 1.0));
                         //imageStore(img, coord, vec4(vec3(1.0 - length(uv - cell_local.cells[1].pos)),1.0));// / length(cell_local.cells[1].pos - cell_local.cells[0].pos)), 1.0));
                         //return;
-                    }
+                    }*/
                     
 
                 }
                 if (render_features){
                         float alignment = plateAlignment(cell, uv, iSeed);
-                        vec3 mountain = vec3(alignment,0.0,0.0);
+                        //imageStore(img, coord, vec4(vec3(height), 1.0));
+                        //return;
+
                         //fragColor = vec4(mountain,1.0);
                         //return;
                         if (alignment > 0.0){
-                            vec3 mountain = vec3(alignment,0.0,0.0);
-                            //fragColor = vec4(mountain,1.0);
+                            if (height >= 0.5)
+                                height += alignment * 2.0;
+                            //imageStore(img, coord, vec4(vec3(alignment * 5.0), 1.0));
                             //return;
                             vec3 color = heightToColor(height);
-                            float factor = 0.5;
-                            color.r = mix(mountain.r, color.r, factor);
+
+                            //float factor = 0.5;
+                            //color.r = mix(mountain.r, color.r, factor);
                             //color.gb = color.gb / 2.0;
 
                             imageStore(img, coord, vec4(color, 1.0));
