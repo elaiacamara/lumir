@@ -17,7 +17,7 @@
 #include <Syris/renderer/camera/PerspectiveCamera.hpp>
 #include <Syris/renderer/OnUpdate.hpp>
 #include <Syris/events/Event.hpp>
-#include <Syris/utils/containers/Singleton.hpp>
+#include <utils-lib/containers/Singleton.hpp>
 
 #include "lumir/renderer/Renderer.hpp"
 //import std;
@@ -206,9 +206,22 @@ namespace lumir {
             throw std::runtime_error("Failed to make descriptor pool");
         m_descriptor_pool = descriptor_pool_res.value();
 
-        auto texture_info = vkl::Image::CreateInfo{
+        ulib::Singleton<vkl::GraphicsContext>::init(vkl::GraphicsContext{
             .device = m_device,
             .physical_device = m_physical_device,
+            .graphics_queue = m_graphics_queue,
+            .present_queue = m_present_queue,
+            .transfer_queue = m_transfer_queue,
+            .compute_queue = m_compute_queue,
+            .graph_pres_command_pool = m_graphs_pres_command_pool,
+            .transfer_command_pool = m_transfer_command_pool,
+            .compute_command_pool = m_compute_command_pool,
+            .graph_pres_command_buffer = m_main_command_buffer,
+            .transfer_command_buffer = m_transfer_command_buffer,
+            .compute_command_buffer = m_compute_command_buffer,
+            .descriptor_pool = m_descriptor_pool
+        });
+        auto texture_info = vkl::Image::CreateInfo{
             .source = vkl::Image::Source{std::filesystem::path(PROJECT_ROOT) / "assets" / "images" / "smile.jpg"},
             .dimmensions = {640,640},
             .format = vk::Format::eR8G8B8A8Srgb,
@@ -216,9 +229,7 @@ namespace lumir {
             .layout = vk::ImageLayout::eShaderReadOnlyOptimal,
             .access = vk::AccessFlagBits::eShaderRead,
             .pipeline_stage = vk::PipelineStageFlagBits::eFragmentShader,
-            .command_buffer = m_main_command_buffer,
-            .command_pool = m_graphs_pres_command_pool,
-            .queue = m_graphics_queue.queue,
+            .context_type = vkl::GraphicsContext::Type::eGraphics,
             .descriptor_layout = vk::DescriptorSetLayout{},
             .descriptor_pool = m_descriptor_pool
         };
@@ -479,21 +490,6 @@ namespace lumir {
 
         m_camera.m_device = m_device;
 
-        Syris::Singleton<vkl::GraphicsContext>::init(vkl::GraphicsContext{
-            .device = m_device,
-            .physical_device = m_physical_device,
-            .graphics_queue = m_graphics_queue,
-            .present_queue = m_present_queue,
-            .transfer_queue = m_transfer_queue,
-            .compute_queue = m_compute_queue,
-            .graph_pres_command_pool = m_graphs_pres_command_pool,
-            .transfer_command_pool = m_transfer_command_pool,
-            .compute_command_pool = m_compute_command_pool,
-            .graph_pres_command_buffer = m_main_command_buffer,
-            .transfer_command_buffer = m_transfer_command_buffer,
-            .compute_command_buffer = m_compute_command_buffer,
-            .descriptor_pool = m_descriptor_pool
-        });
 
         m_world = std::make_unique<World>(info.world_info);
         m_texture_set = ImGui_ImplVulkan_AddTexture(m_texture->get_sampler(), m_texture->get_image_view(), static_cast<VkImageLayout>(vk::ImageLayout::eShaderReadOnlyOptimal));
@@ -694,13 +690,13 @@ namespace lumir {
 
         command_buffer.bindPipeline(vk::PipelineBindPoint::eGraphics, m_pipeline);
 
-        m_world->change_position(m_camera.getCamera().get_position());
+        /*m_world->change_position(m_camera.getCamera().get_position());
 
         auto chunks = m_world->get_chunk_manager().get_chunks();
         ImGui::Begin("Meshes");
         for (auto [index, chunk] : std::views::enumerate(chunks)){
             assert(chunk.is_ready());
-            auto mesh = chunk.generate_mesh();
+            auto& mesh = chunk.generate_mesh();
             auto mesh_buffer_res = mesh.get_buffer(m_device, m_physical_device, m_transfer_queue.queue, m_transfer_command_buffer);
             if (!mesh_buffer_res)
                 return db::error("Failed to generate mesh", mesh_buffer_res.error());
@@ -713,7 +709,7 @@ namespace lumir {
             command_buffer.draw(mesh.get_vertices_count(), 1, 0, 0);
         }
         ImGui::Image(m_texture_set, {640,640});
-        ImGui::End();
+        ImGui::End();*/
         const auto update = Syris::OnUpdate{time, frame_number};
         m_camera.on_update(update);
         m_world->on_update(update);

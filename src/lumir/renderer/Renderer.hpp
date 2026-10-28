@@ -113,23 +113,6 @@ namespace lumir{
             ImGui_ImplVulkan_NewFrame();
             ImGui_ImplGlfw_NewFrame();
             ImGui::NewFrame();
-/*
-            vk::CommandBufferBeginInfo beginInfo = {};
-            if (command_buffer.begin(beginInfo) != vk::Result::eSuccess)
-                return db::error("failed to begin main command buffer");;
-
-            vk::RenderPassBeginInfo renderPassInfo = {};
-            renderPassInfo.renderPass = m_render_pass;
-            renderPassInfo.framebuffer = m_swapchain.get_frames()[m_frame_number].m_framebuffer;
-            renderPassInfo.renderArea.offset.x = 0;
-            renderPassInfo.renderArea.offset.y = 0;
-            renderPassInfo.renderArea.extent = m_swapchain.get_extent();
-            vk::ClearValue clearColor = { std::array<float, 4>{0.0f, 0.0f, 1.0f, 1.0f} };
-            renderPassInfo.clearValueCount = 1;
-            renderPassInfo.pClearValues = &clearColor;
-
-            command_buffer.beginRenderPass(&renderPassInfo, vk::SubpassContents::eInline);
-*/
             auto render_res = m_render_f(command_buffer, m_frame_number, m_time);
             if (!render_res)
                 return db::error("Failed to render frame", render_res.error());

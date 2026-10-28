@@ -1,0 +1,89 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout(rgba32f, binding = 0) uniform image2D img_render;
+layout(rgba32i, binding = 1) uniform iimage2D img;
+layout(std430, binding = 2) buffer CounterBuffer
+{
+    int counter;
+};
+struct ContinentIDPos{
+    ivec2 pos;
+    float continent_id;
+};
+layout(std430, binding = 3) buffer ContinentPos
+{
+    ContinentIDPos continent_pos[];
+};
+struct IslandIdContinentID{
+    ivec2 IDs;
+};
+layout(std430, binding = 4) buffer Buffer
+{
+    IslandIdContinentID mapping[];
+};
+
+
+vec2 to_position(int packed){
+    int x =  packed & 0xFFFF;
+    int y = (packed >> 16) & 0xFFFF;
+    return vec2(x, y);
+}
+
+void main()
+{   
+    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = imageSize(img);
+    if (coord.x >= size.x || coord.y >= size.y) return;
+    ivec4 value = imageLoad(img, coord);
+    int ID = value.y;
+    if (ID != -1)
+        return;
+
+
+    vec2 pos = to_position(value.z);
+    ivec4 closest_value = imageLoad(img, ivec2(pos));
+    int closest_id = closest_value.y;
+    const ivec2 offsets[8] = ivec2[](
+        ivec2(0, 1),
+        ivec2(1, 0),
+        ivec2(1, 1),
+        ivec2(0, -1),
+        ivec2(-1, 0),
+        ivec2(-1, -1),
+        ivec2(1, -1),
+        ivec2(-1, 1)
+    );
+    for (int i = 0; i < 8; i++) {
+        ivec2 neighbor_coord = coord + offsets[i];
+        if (neighbor_coord.x >= size.x || neighbor_coord.y >= size.y || neighbor_coord.x < 0 || neighbor_coord.y < 0)
+            continue;
+        ivec4 neighbor_value = imageLoad(img, neighbor_coord);
+        if (neighbor_value.y != -1){
+            if (neighbor_value.y != closest_id){//two land separated by one water
+                int idx = atomicAdd(counter, 1);
+                if (idx > counter)
+                    continue;
+                ContinentIDPos id_pos;
+                id_pos.continent_id = neighbor_value.z;
+                id_pos.pos = coord;
+                continent_pos[idx] = id_pos;
+            }
+    
+        }else{
+            ivec2 neighbor_carry_pos = ivec2(to_position(neighbor_value.z));
+            ivec4 neighbor_carry_value = imageLoad(img, ivec2(neighbor_carry_pos));
+            int neighbor_carry_id = neighbor_carry_value.y;
+
+            if (neighbor_carry_id != closest_id){
+                int idx = atomicAdd(counter, 1);
+                if (idx > counter)
+                    continue;
+                ContinentIDPos id_pos;
+                id_pos.continent_id = neighbor_carry_id;
+                id_pos.pos = coord;
+                continent_pos[idx] = id_pos;
+            }
+        }
+    }
+}

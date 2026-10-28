@@ -1,0 +1,71 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout(rgba32f, binding = 0) uniform image2D img_render;
+layout(rgba32i, binding = 1) uniform iimage2D img;
+layout(std430, binding = 2) buffer CounterBuffer
+{
+    int counter;
+};
+struct IDsDist{
+    ivec2 IDs;
+    float dis;
+};
+layout(std430, binding = 3) buffer BufferIDDist
+{
+    IDsDist ids_dist[];
+};
+struct IslandIdContinentID{
+    ivec2 IDs;
+};
+layout(std430, binding = 4) buffer Buffer
+{
+    IslandIdContinentID mapping[];
+};
+
+
+//for each channel
+//continental oceanic
+//uplift downlift
+//volcanic activity
+//each channel is older
+
+//flood
+//rg32i for ID
+
+
+void main()
+{   
+    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = imageSize(img);
+    if (coord.x >= size.x || coord.y >= size.y) return;
+    ivec4 value = imageLoad(img, coord);
+    int ID = value.y;
+
+    if (ID == -1)
+        return;
+
+    const ivec2 offsets[8] = ivec2[](
+        ivec2(0, 1),
+        ivec2(1, 0),
+        ivec2(0, -1),
+        ivec2(-1, 0),
+        ivec2(1, 1),
+        ivec2(-1, -1),
+        ivec2(1, -1),
+        ivec2(-1, 1)
+    );
+    int min_id = ID;
+    for (int i = 0; i < 8; i++) {
+        ivec2 neighbor_coord = coord + offsets[i];
+        if (neighbor_coord.x >= size.x || neighbor_coord.y >= size.y || neighbor_coord.x < 0 || neighbor_coord.y < 0) continue;
+        ivec4 neighbor_value = imageLoad(img, neighbor_coord);
+        if (neighbor_value.y != -1)
+            min_id = min(min_id, neighbor_value.y);
+    }
+    imageStore(img, coord, ivec4(value.x, value.y, min_id, 1));
+    /*
+    vec3 color = heightToColor(value.x);
+    imageStore(img, coord, vec4(color, 1.0));
+    */
+}

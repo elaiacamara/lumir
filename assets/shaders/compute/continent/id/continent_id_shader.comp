@@ -1,0 +1,92 @@
+#version 450
+
+// propagate shore position throw ocean
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout(rgba32f, binding = 0) uniform image2D img_render;
+layout(rgba32i, binding = 1) uniform iimage2D img;
+layout(std430, binding = 2) buffer CounterBuffer
+{
+    int counter;
+};
+struct IDsDist{
+    ivec2 IDs;
+    float dis;
+};
+layout(std430, binding = 3) buffer BufferIDDist
+{
+    IDsDist ids_dist[];
+};
+struct IslandIdContinentID{
+    ivec2 IDs;
+};
+layout(std430, binding = 4) buffer Buffer
+{
+    IslandIdContinentID mapping[];
+};
+
+
+//for each channel
+//continental oceanic
+//uplift downlift
+//volcanic activity
+//each channel is older
+
+//flood
+//rg32i for ID
+
+vec2 to_position(int packed){
+    int x =  packed & 0xFFFF;
+    int y = (packed >> 16) & 0xFFFF;
+    return vec2(x, y);
+}
+int from_position(vec2 vec){
+    ivec2 v = ivec2(vec);
+    return (v.x & 0xFFFF) | ((v.y & 0xFFFF) << 16);
+}
+
+void main()
+{   
+    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = imageSize(img);
+    if (coord.x >= size.x || coord.y >= size.y) return;
+    ivec4 value = imageLoad(img, coord);
+    int ID = value.y;
+
+    if (ID != -1)
+        return;
+
+    const ivec2 offsets[8] = ivec2[](
+        ivec2(0, 1),
+        ivec2(1, 0),
+        ivec2(0, -1),
+        ivec2(-1, 0),
+        ivec2(1, 1),
+        ivec2(-1, -1),
+        ivec2(1, -1),
+        ivec2(-1, 1)
+    );
+    float closest_dist = 100000.0;
+    int closest_pos = 0;
+    for (int i = 0; i < 8; i++) {
+        ivec2 neighbor_coord = coord + offsets[i];
+        if (neighbor_coord.x >= size.x || neighbor_coord.y >= size.y || neighbor_coord.x < 0 || neighbor_coord.y < 0)
+            continue;
+        ivec4 neighbor_value = imageLoad(img, neighbor_coord);
+        if (neighbor_value.y != -1){
+            float dist = length(vec2(neighbor_coord) - vec2(coord));
+            if (dist < closest_dist){
+                closest_pos = from_position(vec2(neighbor_coord));
+                closest_dist = dist;
+            }
+        }else{
+            vec2 neighbor_carry_pos = to_position(neighbor_value.z);
+            float neighbor_dis = length(neighbor_carry_pos - vec2(coord));
+            if (neighbor_dis < closest_dist){
+                closest_dist = neighbor_dis;
+                closest_pos = neighbor_value.z;
+            }
+        }
+    }
+    imageStore(img, coord, ivec4(value.x, value.y, value.z, closest_pos));
+}

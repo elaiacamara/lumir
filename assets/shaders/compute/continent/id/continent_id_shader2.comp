@@ -1,0 +1,38 @@
+#version 450
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+layout(rgba32f, binding = 0) uniform image2D img_render;
+layout(rgba32i, binding = 1) uniform iimage2D img;
+layout(std430, binding = 2) buffer CounterBuffer
+{
+    int counter;
+};
+struct IDsDist{
+    ivec2 IDs;
+    float dis;
+};
+layout(std430, binding = 3) buffer BufferIDDist
+{
+    IDsDist ids_dist[];
+};
+struct IslandIdContinentID{
+    ivec2 IDs;
+};
+layout(std430, binding = 4) buffer Buffer
+{
+    IslandIdContinentID mapping[];
+};
+
+void main()
+{   
+    ivec2 coord = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = imageSize(img);
+    if (coord.x >= size.x || coord.y >= size.y) return;
+    ivec4 value = imageLoad(img, coord);
+    int ID = value.y;
+
+    if (ID != -1)
+        return;
+
+    imageStore(img, coord, ivec4(value.x, value.y, value.w, value.w));
+}

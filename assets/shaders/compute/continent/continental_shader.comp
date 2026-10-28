@@ -1,7 +1,27 @@
 #version 450
 
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
-layout(rgba32f, binding = 0) uniform image2D img;
+layout(rgba32f, binding = 0) uniform image2D img_render;
+layout(rgba32i, binding = 1) uniform iimage2D img;
+layout(std430, binding = 2) buffer CounterBuffer
+{
+    int counter;
+};
+struct IDsDist{
+    ivec2 IDs;
+    float dis;
+};
+layout(std430, binding = 3) buffer BufferIDDist
+{
+    IDsDist ids_dist[];
+};
+struct IslandIdContinentID{
+    ivec2 IDs;
+};
+layout(std430, binding = 4) buffer Buffer
+{
+    IslandIdContinentID mapping[];
+};
 
 
 
@@ -387,9 +407,17 @@ void main()
     float continental_threshold = 0.55;
     float noise_frequency = 15.0;
     
+    bool render = false;
     float height_2 = get_height(cell, uv, continental_threshold);
-    vec3 color = heightToColor(height_2);
-    imageStore(img, coord, vec4(color, 1.0));
+    if (render){
+        vec3 color = heightToColor(height_2);
+        imageStore(img_render, coord, vec4(color, 1.0));
+    }else{
+        if (height_2 >= 0.5)
+            imageStore(img, coord, ivec4(height_2 * 5000, coord.y * size.x + coord.x,0, 1));
+        else
+            imageStore(img, coord, ivec4(height_2 * 5000, -1,0, 1));
+    }
     return;
     
     if (continent_render){
@@ -406,7 +434,7 @@ void main()
         float edgeDist = cell.cells[1].dist - cell.cells[0].dist;
         if (edgeDist < borderWidth && render_edge){
             color = vec3(0.0); // black border
-            imageStore(img, coord, vec4(color, 1.0));
+            imageStore(img_render, coord, vec4(color, 1.0));
         }
         else{
           
@@ -458,14 +486,14 @@ void main()
                             //color.r = mix(mountain.r, color.r, factor);
                             //color.gb = color.gb / 2.0;
 
-                            imageStore(img, coord, vec4(color, 1.0));
+                            imageStore(img_render, coord, vec4(color, 1.0));
                             return;
                         }
                     }
                 color = heightToColor(height);
             }
         }
-        imageStore(img, coord, vec4(color, 1.0));
+        imageStore(img_render, coord, vec4(color, 1.0));
         
     }else{
      
